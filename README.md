@@ -13,8 +13,8 @@ You need to provide a single processor function of the interface `ProcessEvent(e
 This simplifes development, testing and deployment, becuase now each microservice essentially boils down to one method that does the required work and emits its own events if required. 
 
 One way of maximizing effectiveness is to use the following pattern when dealing with events:
-* Use the `ProcessEvent` method to immediately store the event in a database as a record of *what has happened*. 
-* Spawn a new goroutine to examine what has happned and decide *what to do next*, writing that down in the database. This can be made idempotent by joining or checking the associations between what has happened and what to do next to see actions have already been recorded. 
+* Use the `ProcessEvent` method to immediately store the event in a database as a record of *what has happened*. Note that `ProcessEvent` may be called multiples times per event or out of order w.r.t events received, so the events and the processors need to be designed to handle this.
+* Spawn a new goroutine to examine what has happned and decide *what to do next*, writing that down in the database. This can be made idempotent by joining or checking the associations between what has happened and what to do next to see if actions have already been recorded, or by making the ID of the action deterministic based on the inputs to it - see [Content Based UULID](https://github.com/sudhirj/uulid.go). 
 * Spawn a new goroutine to do what's been commited as what to do next. After doing it, the goroutine can mark the work as completed in the databse. To prevent multiple goroutines from doing the same work at the same time, locks can be used (pg_advisory_locks, redis locks), but the events need to be designed to be idempotent in either case. 
 
 If the pattern above is followed, each microservice can be deployed as a combination of one or more of the above interfaces depending on the environment and execution environment availalbe. 
