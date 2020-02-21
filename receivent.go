@@ -1,6 +1,8 @@
 package receivent
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 import "net/http"
 
 type EventProcessor interface {
@@ -17,7 +19,7 @@ type Receiver struct {
 	processor EventProcessor
 }
 
-func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (receiver *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	event := json.RawMessage{}
 
 	err := json.NewDecoder(r.Body).Decode(&event)
@@ -27,7 +29,7 @@ func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = rc.processor.ProcessEvent(event)
+	err = receiver.processor.ProcessEvent(event)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
