@@ -8,6 +8,37 @@ When using an event driven architecture like Event Sourcing, it makes a lot of s
 * **SQS Worker Pool** with conigurable parallelism that fetches and correctly acknowledges each message when processed without error. 
 * [**Lambda Handler**](https://docs.aws.amazon.com/lambda/latest/dg/with-sqs-create-package.html#with-sqs-example-deployment-pkg-go) that allows for easy Lambda deployment and correctly acknowledges messages processed without error. 
 
+## Usage
+```go
+
+// The event processor interface has a single method: 
+type EventProcessor interface {
+	ProcessEvent(event json.RawMessage) error
+}
+
+// You can also wrap a function to be a processor:
+processor := receivent.EventProcessorFunc(
+    func(event json.RawMessage) error {
+        return nil
+    })
+
+// Create a receiver by passing in an EventProcessor
+receiver := receivent.New(processor)
+    
+// Start the SQS worker pool with 15 goroutines 
+go receiver.StartSQSListener(15)
+
+// Hand event POSTs into /receive
+http.Handle("/receive", receiver)
+
+// Set up SNS receiver
+http.Handle("/sns", receiver.SNSHandler)
+
+// If you're using a pure Lambda
+lambda.Start(receiver.LambdaHandler)
+```
+
+## Concepts
 You need to provide a single processor function of the interface `ProcessEvent(event json.RawMessage) (err)`. All interfaces will call this method and acknowledge messages successfully when `err` is `nil`. The `ProcessEvent` method must be safe for calling from multiple goroutines. 
 
 This simplifes development, testing and deployment, becuase now each microservice essentially boils down to one method that does the required work and emits its own events if required. 
