@@ -21,7 +21,7 @@ func TestHTTPHandler(t *testing.T) {
 	failIfError(t, err)
 	done := make(chan struct{})
 
-	testServer := httptest.NewServer(New(EventProcessorFunc(func(input json.RawMessage) error {
+	testServer := httptest.NewServer(New(EventProcessorFunc(func(input []byte) error {
 		var e testEvent
 		err = json.Unmarshal(input, &e)
 		failIfError(t, err)
@@ -78,7 +78,7 @@ func TestSQSWorkerPool(t *testing.T) {
 		t:        t,
 	}
 
-	receiver := New(EventProcessorFunc(func(input json.RawMessage) error {
+	receiver := New(EventProcessorFunc(func(input []byte) error {
 		var e testEvent
 		err := json.Unmarshal(input, &e)
 		failIfError(t, err)

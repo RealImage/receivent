@@ -1,21 +1,20 @@
 package receivent
 
 import (
-	"encoding/json"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
+	"io/ioutil"
 	"net/http"
-	"strings"
 )
 
 type EventProcessor interface {
-	ProcessEvent(event json.RawMessage) error
+	ProcessEvent(event []byte) error
 }
 
-type EventProcessorFunc func(event json.RawMessage) error
+type EventProcessorFunc func(event []byte) error
 
-func (f EventProcessorFunc) ProcessEvent(e json.RawMessage) error {
+func (f EventProcessorFunc) ProcessEvent(e []byte) error {
 	return f(e)
 }
 
@@ -24,16 +23,14 @@ type Receiver struct {
 }
 
 func (receiver *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	event := json.RawMessage{}
-
-	err := json.NewDecoder(r.Body).Decode(&event)
+	eventBody, err := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
-		http.Error(w, "JSON decoding failed", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = receiver.processor.ProcessEvent(event)
+	err = receiver.processor.ProcessEvent(eventBody)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -47,9 +44,7 @@ func (receiver *Receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL
 	for i := 0; i < parallelism; i++ {
 		go func() {
 			for message := range pool {
-				event := json.RawMessage{}
-				_ = json.NewDecoder(strings.NewReader(aws.StringValue(message.Body))).Decode(&event)
-				err := receiver.processor.ProcessEvent(event)
+				err := receiver.processor.ProcessEvent([]byte(aws.StringValue(message.Body)))
 				if err == nil {
 					_, _ = sqsClient.DeleteMessage(&sqs.DeleteMessageInput{
 						QueueUrl:      aws.String(queueURL),

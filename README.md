@@ -13,12 +13,12 @@ When using an event driven architecture like Event Sourcing, it makes a lot of s
 
 // The event processor interface has a single method: 
 type EventProcessor interface {
-	ProcessEvent(event json.RawMessage) error
+	ProcessEvent(event []byte) error
 }
 
 // You can also wrap a function to be a processor:
 processor := receivent.EventProcessorFunc(
-    func(event json.RawMessage) error {
+    func(event []byte) error {
         return nil
     })
 
