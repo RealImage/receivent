@@ -25,8 +25,11 @@ processor := receivent.EventProcessorFunc(
 // Create a receiver by passing in an EventProcessor
 receiver := receivent.New(processor)
     
-// Start the SQS worker pool with 15 goroutines 
-go receiver.StartSQSListener(15)
+// Start the SQS worker pool with 15 goroutines
+sess := session.Must(session.NewSession())
+sqsClient := sqs.New(sess)
+
+go receiver.StartSQSWorkerPool(sqsClient, queueURL, 15)
 
 // Hand event POSTs into /receive
 http.Handle("/receive", receiver)
