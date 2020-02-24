@@ -3,8 +3,8 @@ package receivent
 import (
 	"encoding/json"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"net/http"
 	"strings"
 )
@@ -42,8 +42,7 @@ func (receiver *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (receiver *Receiver) StartSQSListener(sess *session.Session, queueURL string, parallelism int) error {
-	sqsClient := sqs.New(sess)
+func (receiver *Receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL string, parallelism int) error {
 	pool := make(chan *sqs.Message)
 	for i := 0; i < parallelism; i++ {
 		go func() {
@@ -51,7 +50,7 @@ func (receiver *Receiver) StartSQSListener(sess *session.Session, queueURL strin
 				event := json.RawMessage{}
 				_ = json.NewDecoder(strings.NewReader(aws.StringValue(message.Body))).Decode(&event)
 				err := receiver.processor.ProcessEvent(event)
-				if err != nil {
+				if err == nil {
 					_, _ = sqsClient.DeleteMessage(&sqs.DeleteMessageInput{
 						QueueUrl:      aws.String(queueURL),
 						ReceiptHandle: message.ReceiptHandle,
@@ -61,7 +60,11 @@ func (receiver *Receiver) StartSQSListener(sess *session.Session, queueURL strin
 		}()
 	}
 	for {
-		messageOutput, _ := sqsClient.ReceiveMessage(&sqs.ReceiveMessageInput{QueueUrl: aws.String(queueURL)})
+		messageOutput, _ := sqsClient.ReceiveMessage(&sqs.ReceiveMessageInput{
+			MaxNumberOfMessages: aws.Int64(int64(parallelism)),
+			QueueUrl:            aws.String(queueURL),
+			WaitTimeSeconds:     aws.Int64(int64(20)),
+		})
 		for _, message := range messageOutput.Messages {
 			pool <- message
 		}
