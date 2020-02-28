@@ -5,7 +5,7 @@ When using an event driven architecture like Event Sourcing, it makes a lot of s
 
 * [**HTTP(S) Handler**](https://golang.org/pkg/net/http/#Handler) for receiving events as JSON via POST requests and acknowledges them with 200 OK when processed without error. You can mount this at whatever path makes sense for your application. 
 * [**SNS HTTP(S) Handler**](https://golang.org/pkg/net/http/#Handler) that validates SNS messages and acknowledges them correctly when processed without error. You can mount this at whatever path in your application is configured as the SNS receiver. 
-* **SQS Worker Pool** with conigurable parallelism that fetches and correctly acknowledges each message when processed without error. 
+* **SQS Worker Pool** with configurable parallelism that fetches and correctly acknowledges each message when processed without error. 
 * [**Lambda Handler**](https://docs.aws.amazon.com/lambda/latest/dg/with-sqs-create-package.html#with-sqs-example-deployment-pkg-go) that allows for easy Lambda deployment and correctly acknowledges messages processed without error. 
 
 ## Usage

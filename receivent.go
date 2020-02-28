@@ -6,6 +6,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 type EventProcessor interface {
@@ -39,7 +42,7 @@ func (receiver *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (receiver *Receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL string, parallelism int) error {
+func (receiver *Receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL string, parallelism int) {
 	pool := make(chan *sqs.Message)
 	for i := 0; i < parallelism; i++ {
 		go func() {
@@ -54,14 +57,24 @@ func (receiver *Receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL
 			}
 		}()
 	}
+	// Before we the start the inifinite loop, let's listen for closing signals
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	for {
-		messageOutput, _ := sqsClient.ReceiveMessage(&sqs.ReceiveMessageInput{
-			MaxNumberOfMessages: aws.Int64(int64(parallelism)),
-			QueueUrl:            aws.String(queueURL),
-			WaitTimeSeconds:     aws.Int64(int64(20)),
-		})
-		for _, message := range messageOutput.Messages {
-			pool <- message
+		select {
+		case _, signalled := <-sigs:
+			if signalled {
+				return
+			}
+		default:
+			messageOutput, _ := sqsClient.ReceiveMessage(&sqs.ReceiveMessageInput{
+				MaxNumberOfMessages: aws.Int64(int64(parallelism)),
+				QueueUrl:            aws.String(queueURL),
+				WaitTimeSeconds:     aws.Int64(int64(20)),
+			})
+			for _, message := range messageOutput.Messages {
+				pool <- message
+			}
 		}
 	}
 
