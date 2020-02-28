@@ -34,7 +34,7 @@ func TestHTTPHandler(t *testing.T) {
 	resp, err := http.Post(testServer.URL, "application/json", bytes.NewReader(eventJSON))
 	failIfError(t, err)
 	if resp.StatusCode != 200 {
-		t.Fatal("Server should complete cleanly")
+		t.Fatal("Request should complete cleanly")
 	}
 	<-done
 }

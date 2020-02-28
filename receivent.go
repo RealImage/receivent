@@ -24,11 +24,17 @@ func (f EventProcessorFunc) ProcessEvent(e []byte) error {
 	return f(e)
 }
 
-type Receiver struct {
+type Receiver interface {
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL string, parallelism int)
+	StartLambdaForSQS()
+}
+
+type receiver struct {
 	processor EventProcessor
 }
 
-func (receiver *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (rc *receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	eventBody, err := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
@@ -36,7 +42,7 @@ func (receiver *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = receiver.processor.ProcessEvent(eventBody)
+	err = rc.processor.ProcessEvent(eventBody)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -45,12 +51,12 @@ func (receiver *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (receiver *Receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL string, parallelism int) {
+func (rc *receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL string, parallelism int) {
 	pool := make(chan *sqs.Message)
 	for i := 0; i < parallelism; i++ {
 		go func() {
 			for message := range pool {
-				err := receiver.processor.ProcessEvent([]byte(aws.StringValue(message.Body)))
+				err := rc.processor.ProcessEvent([]byte(aws.StringValue(message.Body)))
 				if err == nil {
 					_, _ = sqsClient.DeleteMessage(&sqs.DeleteMessageInput{
 						QueueUrl:      aws.String(queueURL),
@@ -82,11 +88,11 @@ func (receiver *Receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL
 	}
 }
 
-func (receiver *Receiver) StartLambdaForSQS() {
+func (rc *receiver) StartLambdaForSQS() {
 	lambda.Start(func(ctx context.Context, sqsEvent events.SQSEvent) error {
 		// TODO parallelize
 		for _, record := range sqsEvent.Records {
-			err := receiver.processor.ProcessEvent([]byte(record.Body))
+			err := rc.processor.ProcessEvent([]byte(record.Body))
 			if err != nil {
 				return err
 			}
@@ -95,6 +101,6 @@ func (receiver *Receiver) StartLambdaForSQS() {
 	})
 }
 
-func New(processor EventProcessor) *Receiver {
-	return &Receiver{processor: processor}
+func New(processor EventProcessor) Receiver {
+	return &receiver{processor: processor}
 }
