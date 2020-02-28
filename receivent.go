@@ -1,6 +1,9 @@
 package receivent
 
 import (
+	"context"
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
@@ -77,7 +80,19 @@ func (receiver *Receiver) StartSQSWorkerPool(sqsClient sqsiface.SQSAPI, queueURL
 			}
 		}
 	}
+}
 
+func (receiver *Receiver) StartLambdaForSQS() {
+	lambda.Start(func(ctx context.Context, sqsEvent events.SQSEvent) error {
+		// TODO parallelize
+		for _, record := range sqsEvent.Records {
+			err := receiver.processor.ProcessEvent([]byte(record.Body))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func New(processor EventProcessor) *Receiver {
