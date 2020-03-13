@@ -1,4 +1,5 @@
-# Receivent
+# DEPRECATED - see https://github.com/RealImage/eventbox/
+
 Event receiver library in Go. Suitable for receiving events over SQS, HTTP, SNS and Lambda. 
 
 When using an event driven architecture like Event Sourcing, it makes a lot of sense for each event handling microservice to be able to receive events off a reliable queue for production, with the same processing happening off HTTP for testing. This library enables setting up an event receiver that provides the following interfaces:
